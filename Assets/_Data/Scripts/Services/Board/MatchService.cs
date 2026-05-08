@@ -6,6 +6,39 @@ namespace _Data.Scripts.Services.Board
 {
     public class MatchService
     {
+        public void FindCombo(int boardSize, Transform holder, BoardService boardService)
+        {
+            var allMatchedPositions = new HashSet<Vector2Int>();
+
+            for (int i = 0; i < boardSize; i++)
+            {
+                for (int j = 0; j < boardSize; j++)
+                {
+                    if (boardService.BoardData[i][j] == null) continue;
+
+                    var find = FindMatch(boardService.BoardData[i][j], boardService.BitBoardData);
+                    if (find.Count > 0)
+                    {
+                        for (int k = 0; k < find.Count; k++)
+                        {
+                            allMatchedPositions.Add(find[k]);
+                        }
+                    }
+                }
+            }
+
+            if (allMatchedPositions.Count == 0)
+            {
+                return;
+            }
+
+            boardService.RemoveMatch(new List<Vector2Int>(allMatchedPositions));
+            boardService.Fall(boardSize);
+            boardService.Fill(boardSize, holder);
+
+            FindCombo(boardSize, holder, boardService);
+        }
+
         public List<Vector2Int> FindMatch(GameObject go, int[][] bitBoard)
         {
             var comp = go.GetComponent<CandyController>();

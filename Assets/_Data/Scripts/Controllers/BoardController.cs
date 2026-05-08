@@ -27,6 +27,8 @@ namespace _Data.Scripts.Controllers
 
         private void Update()
         {
+            _matchService.FindCombo(boardSize, holder, _boardService);
+
             if (inputController.IsClick())
             {
                 var startPos = inputController.StartPosition;
@@ -46,6 +48,9 @@ namespace _Data.Scripts.Controllers
                 var totalRemove = Find(_firstCandy, _secondCandy, _boardService.BitBoardData);
 
                 _boardService.RemoveMatch(totalRemove);
+
+                _boardService.Fall(boardSize);
+                _boardService.Fill(boardSize, holder);
             }
         }
 
