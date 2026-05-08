@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
 using _Data.Scripts.Services.Board;
+using _Data.Scripts.States.Board;
 using Base.Core.Architecture;
+using Base.Core.StateMachine;
 using UnityEngine;
 
 namespace _Data.Scripts.Controllers
@@ -14,69 +17,51 @@ namespace _Data.Scripts.Controllers
 
         [SerializeField] private Transform holder;
 
+        private StateMachine<BoardState> _stateMachine;
         private GameObject _firstCandy;
         private GameObject _secondCandy;
 
         private readonly BoardService _boardService = new BoardService();
         private readonly MatchService _matchService = new MatchService();
 
-        private void Start()
+        public InputController InputController => inputController;
+        public int BoardSize => boardSize;
+        public Transform Holder => holder;
+        public BoardService BoardService => _boardService;
+        public MatchService MatchService => _matchService;
+
+        public GameObject FirstCandy
         {
-            _boardService.GenerateBoard(boardSize, holder);
+            get => _firstCandy;
+            set => _firstCandy = value;
+        }
+
+        public GameObject SecondCandy
+        {
+            get => _secondCandy;
+            set => _secondCandy = value;
+        }
+
+        protected override void Awake()
+        {
+            base.Awake();
+            InitState();
         }
 
         private void Update()
         {
-            _matchService.FindCombo(boardSize, holder, _boardService);
-
-            if (inputController.IsClick())
-            {
-                var startPos = inputController.StartPosition;
-                RaycastHit2D hit2D = Physics2D.Raycast(startPos, Vector2.zero);
-                if (hit2D.collider != null)
-                {
-                    _firstCandy = hit2D.collider.gameObject;
-                }
-            }
-
-            if (inputController.IsDrag())
-            {
-                var dragPos = inputController.DragDirection;
-                _boardService.Swap(_firstCandy, dragPos);
-
-                _secondCandy = _boardService.Second;
-                var totalRemove = Find(_firstCandy, _secondCandy, _boardService.BitBoardData);
-
-                _boardService.RemoveMatch(totalRemove);
-
-                _boardService.Fall(boardSize);
-                _boardService.Fill(boardSize, holder);
-            }
+            _stateMachine.UpdateState();
         }
 
-        List<Vector2Int> Find(GameObject firstCandy, GameObject secondCandy, int[][] bitBoardData)
+        void InitState()
         {
-            var hashSet = new HashSet<Vector2Int>();
-            var firstFind = _matchService.FindMatch(firstCandy, bitBoardData);
-            var secondFind = _matchService.FindMatch(secondCandy, bitBoardData);
-
-            for (int i = 0; i < firstFind.Count; i++)
-            {
-                hashSet.Add(firstFind[i]);
-            }
-
-            for (int i = 0; i < secondFind.Count; i++)
-            {
-                hashSet.Add(secondFind[i]);
-            }
-
-            return new List<Vector2Int>(hashSet);
-        }
-
-        // Test Shuffle
-        public void ShuffleBoard()
-        {
-            _boardService.BoardShuffle(boardSize);
+            _stateMachine = new StateMachine<BoardState>();
+            _stateMachine.AddState(BoardState.Start, new StartState(this, _stateMachine));
+            _stateMachine.AddState(BoardState.Idle, new IdleState(this, _stateMachine));
+            _stateMachine.AddState(BoardState.Swap, new SwapState(this, _stateMachine));
+            _stateMachine.AddState(BoardState.Fall, new FallState(this, _stateMachine));
+            _stateMachine.AddState(BoardState.Fill, new FillState(this, _stateMachine));
+            _stateMachine.SetInitState(BoardState.Start);
         }
     }
 }

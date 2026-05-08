@@ -17,6 +17,8 @@ namespace _Data.Scripts.Services.Board
         public int[][] BitBoardData => _bitBoardData;
         public GameObject Second => _second;
 
+        #region Board Generation
+
         public void GenerateBoard(int boardSize, Transform holder)
         {
             _boardData = new GameObject[boardSize][];
@@ -48,6 +50,10 @@ namespace _Data.Scripts.Services.Board
             }
         }
 
+        #endregion
+
+        #region Core
+
         public void Swap(GameObject first, Vector2Int dir)
         {
             var firstComp = first.GetComponent<CandyController>();
@@ -61,10 +67,12 @@ namespace _Data.Scripts.Services.Board
 
             (first.transform.position, _second.transform.position) =
                 (_second.transform.position, first.transform.position);
+
             _boardData[firstPos.x][firstPos.y] = _second;
             _boardData[secondPos.x][secondPos.y] = first;
             _bitBoardData[firstPos.x][firstPos.y] = secondComp.EnumType;
             _bitBoardData[secondPos.x][secondPos.y] = firstComp.EnumType;
+
             firstComp.SetPosition(secondPos);
             secondComp.SetPosition(firstPos);
         }
@@ -92,7 +100,7 @@ namespace _Data.Scripts.Services.Board
             }
             else
             {
-                Swap(first, dir);
+                Swap(first, -dir);
                 return false;
             }
         }
@@ -139,7 +147,7 @@ namespace _Data.Scripts.Services.Board
             }
         }
 
-        public void Fill(int boardSize, Transform holder)
+        public void Fill(int boardSize, Transform holder, MatchService matchService)
         {
             for (int i = 0; i < boardSize; i++)
             {
@@ -151,7 +159,16 @@ namespace _Data.Scripts.Services.Board
                     }
                 }
             }
+
+            while (!matchService.CanMove(boardSize, this))
+            {
+                BoardShuffle(boardSize);
+            }
         }
+
+        #endregion
+
+        #region Helper
 
         float GetOffest(int boardSize)
         {
@@ -180,5 +197,7 @@ namespace _Data.Scripts.Services.Board
 
             newCandy.transform.parent = holder;
         }
+
+        #endregion
     }
 }

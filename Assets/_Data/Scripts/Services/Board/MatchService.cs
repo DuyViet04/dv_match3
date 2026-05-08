@@ -6,7 +6,23 @@ namespace _Data.Scripts.Services.Board
 {
     public class MatchService
     {
+        private readonly List<Vector2Int> _dirs = new List<Vector2Int> { new Vector2Int(1, 0), new Vector2Int(0, 1) };
+
         public void FindCombo(int boardSize, Transform holder, BoardService boardService)
+        {
+            while (true)
+            {
+                var matched = FindAllMatches(boardSize, boardService);
+
+                if (matched.Count == 0) break;
+
+                boardService.RemoveMatch(matched);
+                boardService.Fall(boardSize);
+                boardService.Fill(boardSize, holder, this);
+            }
+        }
+
+        public List<Vector2Int> FindAllMatches(int boardSize, BoardService boardService)
         {
             var allMatchedPositions = new HashSet<Vector2Int>();
 
@@ -17,26 +33,14 @@ namespace _Data.Scripts.Services.Board
                     if (boardService.BoardData[i][j] == null) continue;
 
                     var find = FindMatch(boardService.BoardData[i][j], boardService.BitBoardData);
-                    if (find.Count > 0)
+                    for (int k = 0; k < find.Count; k++)
                     {
-                        for (int k = 0; k < find.Count; k++)
-                        {
-                            allMatchedPositions.Add(find[k]);
-                        }
+                        allMatchedPositions.Add(find[k]);
                     }
                 }
             }
 
-            if (allMatchedPositions.Count == 0)
-            {
-                return;
-            }
-
-            boardService.RemoveMatch(new List<Vector2Int>(allMatchedPositions));
-            boardService.Fall(boardSize);
-            boardService.Fill(boardSize, holder);
-
-            FindCombo(boardSize, holder, boardService);
+            return new List<Vector2Int>(allMatchedPositions);
         }
 
         public List<Vector2Int> FindMatch(GameObject go, int[][] bitBoard)
@@ -124,6 +128,48 @@ namespace _Data.Scripts.Services.Board
             {
                 return new List<Vector2Int>();
             }
+        }
+
+        public bool CanMove(int boardSize, BoardService boardService)
+        {
+            var bitBoard = boardService.BitBoardData; 
+
+            for (int i = 0; i < boardSize; i++)
+            {
+                for (int j = 0; j < boardSize; j++)
+                {
+                    for (int k = 0; k < _dirs.Count; k++)
+                    {
+                        var posA = new Vector2Int(i, j);
+                        var posB = posA + _dirs[k];
+
+                        if (posB.x < 0 || posB.x >= boardSize ||
+                            posB.y < 0 || posB.y >= boardSize) continue;
+
+                        if (CheckMatch(posA, posB, bitBoard)) return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private bool CheckMatch(Vector2Int posA, Vector2Int posB, int[][] bitBoard)
+        {
+            int temp = bitBoard[posA.x][posA.y];
+            bitBoard[posA.x][posA.y] = bitBoard[posB.x][posB.y];
+            bitBoard[posB.x][posB.y] = temp;
+
+            bool hasMatch =
+                FindHorizontal(posA, bitBoard[posA.x][posA.y], bitBoard).Count > 0 ||
+                FindVertical(posA, bitBoard[posA.x][posA.y], bitBoard).Count > 0 ||
+                FindHorizontal(posB, bitBoard[posB.x][posB.y], bitBoard).Count > 0 ||
+                FindVertical(posB, bitBoard[posB.x][posB.y], bitBoard).Count > 0;
+
+            bitBoard[posB.x][posB.y] = bitBoard[posA.x][posA.y];
+            bitBoard[posA.x][posA.y] = temp;
+
+            return hasMatch;
         }
     }
 }
