@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using _Data.Scripts.Controllers;
 using _Data.Scripts.Enum;
 using Base.Systems.Pool;
@@ -6,10 +7,14 @@ using UnityEngine;
 
 namespace _Data.Scripts.Services.Board
 {
-    public class BoardGenerateService
+    public class BoardService
     {
         private GameObject[][] _boardData;
         private int[][] _bitBoardData;
+        private GameObject _second;
+
+        public int[][] BitBoardData => _bitBoardData;
+        public GameObject Second => _second;
 
         public void GenerateBoard(int boardSize, Transform holder)
         {
@@ -20,7 +25,7 @@ namespace _Data.Scripts.Services.Board
             {
                 _boardData[i] = new GameObject[boardSize];
                 _bitBoardData[i] = new int[boardSize];
-                
+
                 for (int j = 0; j < boardSize; j++)
                 {
                     int idx = Random.Range(1, 7);
@@ -48,6 +53,8 @@ namespace _Data.Scripts.Services.Board
                 for (int j = 0; j < boardSize; j++)
                 {
                     _boardData[i][j].transform.position = GetSpawnPos(i, j, GetOffest(boardSize));
+                    _boardData[i][j].GetComponent<CandyController>().SetPosition(new Vector2Int(i, j));
+                    _bitBoardData[i][j] = _boardData[i][j].GetComponent<CandyController>().EnumType;
                 }
             }
         }
@@ -60,17 +67,26 @@ namespace _Data.Scripts.Services.Board
             var secondPos = firstPos + dir;
             if ((secondPos.x < 0 || secondPos.x >= _boardData.Length) ||
                 (secondPos.y < 0 || secondPos.y >= _boardData[0].Length)) return;
-            var secondObj = _boardData[secondPos.x][secondPos.y];
-            var secondComp = secondObj.GetComponent<CandyController>();
+            _second = _boardData[secondPos.x][secondPos.y];
+            var secondComp = _second.GetComponent<CandyController>();
 
-            (first.transform.position, secondObj.transform.position) =
-                (secondObj.transform.position, first.transform.position);
-            _boardData[firstPos.x][firstPos.y] = secondObj;
+            (first.transform.position, _second.transform.position) =
+                (_second.transform.position, first.transform.position);
+            _boardData[firstPos.x][firstPos.y] = _second;
             _boardData[secondPos.x][secondPos.y] = first;
             _bitBoardData[firstPos.x][firstPos.y] = secondComp.EnumType;
             _bitBoardData[secondPos.x][secondPos.y] = firstComp.EnumType;
             firstComp.SetPosition(secondPos);
             secondComp.SetPosition(firstPos);
+        }
+
+        public void RemoveMatch(List<Vector2Int> pos)
+        {
+            for (int i = 0; i < pos.Count; i++)
+            {
+                PoolManager.Ins.Despawn(_boardData[pos[i].x][pos[i].y]);
+                _bitBoardData[pos[i].x][pos[i].y] = 0;
+            }
         }
 
         float GetOffest(int boardSize)
