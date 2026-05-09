@@ -13,6 +13,7 @@ namespace _Data.Scripts.States.Board
 
         public override void OnEnter()
         {
+            Time.timeScale = 1;
             while (!MatchService.CanMove(BoardSize, BoardService))
             {
                 BoardService.BoardShuffle(BoardSize);

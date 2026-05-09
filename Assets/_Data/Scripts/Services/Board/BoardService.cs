@@ -3,6 +3,7 @@ using _Data.Scripts.Controllers;
 using _Data.Scripts.Enum;
 using Base.Systems.Pool;
 using Base.Utilities;
+using DG.Tweening;
 using UnityEngine;
 
 namespace _Data.Scripts.Services.Board
@@ -19,8 +20,10 @@ namespace _Data.Scripts.Services.Board
 
         #region Board Generation
 
-        public void GenerateBoard(int boardSize, Transform holder)
+        public Sequence GenerateBoard(int boardSize, Transform holder)
         {
+            Sequence s = DOTween.Sequence();
+
             _boardData = new GameObject[boardSize][];
             _bitBoardData = new int[boardSize][];
 
@@ -28,24 +31,30 @@ namespace _Data.Scripts.Services.Board
             {
                 _boardData[i] = new GameObject[boardSize];
                 _bitBoardData[i] = new int[boardSize];
+            }
 
-                for (int j = 0; j < boardSize; j++)
+            for (int y = 0; y < boardSize; y++)
+            {
+                for (int x = 0; x < boardSize; x++)
                 {
-                    Spawn(i, j, boardSize, holder);
+                    s.Append(Spawn(x, y, boardSize, holder));
                 }
             }
+
+            return s;
         }
 
         public void BoardShuffle(int boardSize)
         {
             _boardData.Shuffle();
-            for (int i = 0; i < boardSize; i++)
+            for (int y = 0; y < boardSize; y++)
             {
-                for (int j = 0; j < boardSize; j++)
+                for (int x = 0; x < boardSize; x++)
                 {
-                    _boardData[i][j].transform.position = GetSpawnPos(i, j, GetOffest(boardSize));
-                    _boardData[i][j].GetComponent<CandyController>().SetPosition(new Vector2Int(i, j));
-                    _bitBoardData[i][j] = _boardData[i][j].GetComponent<CandyController>().EnumType;
+                    var candy = _boardData[x][y];
+                    candy.transform.position = GetSpawnPos(x, y, GetOffest(boardSize));
+                    candy.GetComponent<CandyController>().SetPosition(new Vector2Int(x, y));
+                    _bitBoardData[x][y] = candy.GetComponent<CandyController>().EnumType;
                 }
             }
         }
@@ -54,21 +63,14 @@ namespace _Data.Scripts.Services.Board
 
         #region Core
 
-        public void Swap(GameObject first, Vector2Int dir)
+        public void SwapData(GameObject first, GameObject second)
         {
             var firstComp = first.GetComponent<CandyController>();
             var firstPos = firstComp.Position;
+            var secondComp = second.GetComponent<CandyController>();
+            var secondPos = secondComp.Position;
 
-            var secondPos = firstPos + dir;
-            if ((secondPos.x < 0 || secondPos.x >= _boardData.Length) ||
-                (secondPos.y < 0 || secondPos.y >= _boardData[0].Length)) return;
-            _second = _boardData[secondPos.x][secondPos.y];
-            var secondComp = _second.GetComponent<CandyController>();
-
-            (first.transform.position, _second.transform.position) =
-                (_second.transform.position, first.transform.position);
-
-            _boardData[firstPos.x][firstPos.y] = _second;
+            _boardData[firstPos.x][firstPos.y] = second;
             _boardData[secondPos.x][secondPos.y] = first;
             _bitBoardData[firstPos.x][firstPos.y] = secondComp.EnumType;
             _bitBoardData[secondPos.x][secondPos.y] = firstComp.EnumType;
@@ -77,67 +79,103 @@ namespace _Data.Scripts.Services.Board
             secondComp.SetPosition(firstPos);
         }
 
-        public bool TrySwap(GameObject first, Vector2Int dir, MatchService matchService)
+        public Sequence TrySwap(GameObject first, Vector2Int dir, MatchService matchService, out bool isMatch)
         {
-            Swap(first, dir);
-            var hs = new HashSet<Vector2Int>();
+            isMatch = false;
+            var firstComp = first.GetComponent<CandyController>();
+            var firstPos = firstComp.Position;
+            var secondPos = firstPos + dir;
+
+            if (secondPos.x < 0 || secondPos.x >= _boardData.Length ||
+                secondPos.y < 0 || secondPos.y >= _boardData[0].Length) return null;
+
+            _second = _boardData[secondPos.x][secondPos.y];
+
+            var pos1 = first.transform.position;
+            var pos2 = _second.transform.position;
+
+            SwapData(first, _second);
+
             var find1 = matchService.FindMatch(first, _bitBoardData);
             var find2 = matchService.FindMatch(_second, _bitBoardData);
-            for (int i = 0; i < find1.Count; i++)
-            {
-                hs.Add(find1[i]);
-            }
 
-            for (int i = 0; i < find2.Count; i++)
-            {
-                hs.Add(find2[i]);
-            }
+            Sequence s = DOTween.Sequence();
 
-            var total = new List<Vector2Int>(hs);
-            if (total.Count > 0)
+            if (find1.Count > 0 || find2.Count > 0)
             {
-                return true;
+                isMatch = true;
+                s.Append(first.transform.DOMove(pos2, 0.25f).SetEase(Ease.OutQuad));
+                s.Join(_second.transform.DOMove(pos1, 0.25f).SetEase(Ease.OutQuad));
             }
             else
             {
-                Swap(first, -dir);
-                return false;
+                SwapData(first, _second);
+
+                s.Append(first.transform.DOMove(pos2, 0.2f).SetEase(Ease.OutQuad));
+                s.Join(_second.transform.DOMove(pos1, 0.2f).SetEase(Ease.OutQuad));
+
+                s.Append(first.transform.DOMove(pos1, 0.2f).SetEase(Ease.InQuad));
+                s.Join(_second.transform.DOMove(pos2, 0.2f).SetEase(Ease.InQuad));
             }
+
+            return s;
         }
 
-        public void RemoveMatch(List<Vector2Int> pos)
+        public Sequence RemoveMatch(List<Vector2Int> pos)
         {
+            Sequence s = DOTween.Sequence();
+
+            var candyList = new List<GameObject>(pos.Count);
+
             for (int i = 0; i < pos.Count; i++)
             {
-                PoolManager.Ins.Despawn(_boardData[pos[i].x][pos[i].y]);
-                _boardData[pos[i].x][pos[i].y] = null;
-                _bitBoardData[pos[i].x][pos[i].y] = 0;
+                var x = pos[i].x;
+                var y = pos[i].y;
+
+                candyList.Add(_boardData[x][y]);
+                s.Join(_boardData[x][y].transform.DOScale(Vector3.zero, 0.25f).SetEase(Ease.OutQuad));
+
+                _boardData[x][y] = null;
+                _bitBoardData[x][y] = 0;
             }
+
+            s.OnComplete(() =>
+            {
+                for (int i = 0; i < candyList.Count; i++)
+                {
+                    PoolManager.Ins.Despawn(candyList[i]);
+                }
+            });
+
+            return s;
         }
 
-        public void Fall(int boardSize)
+        public Sequence Fall(int boardSize)
         {
+            Sequence s = DOTween.Sequence();
+
             float offset = GetOffest(boardSize);
 
-            for (int i = 0; i < boardSize; i++)
+            for (int y = 0; y < boardSize; y++)
             {
-                for (int j = 0; j < boardSize; j++)
+                for (int x = 0; x < boardSize; x++)
                 {
-                    if (_bitBoardData[i][j] == 0)
+                    if (_bitBoardData[x][y] == 0)
                     {
-                        for (int k = j + 1; k < boardSize; k++)
+                        for (int k = y + 1; k < boardSize; k++)
                         {
-                            if (_bitBoardData[i][k] != 0)
+                            if (_bitBoardData[x][k] != 0)
                             {
-                                _boardData[i][j] = _boardData[i][k];
-                                _bitBoardData[i][j] = _bitBoardData[i][k];
+                                _boardData[x][y] = _boardData[x][k];
+                                _bitBoardData[x][y] = _bitBoardData[x][k];
 
-                                var candy = _boardData[i][j].GetComponent<CandyController>();
-                                candy.SetPosition(new Vector2Int(i, j));
-                                _boardData[i][j].transform.position = GetSpawnPos(i, j, offset);
+                                var candy = _boardData[x][y].GetComponent<CandyController>();
+                                candy.SetPosition(new Vector2Int(x, y));
+                                s.Join(candy.transform.DOMove(GetSpawnPos(x, y, offset), 0.25f).SetEase(Ease.OutQuad));
 
-                                _boardData[i][k] = null;
-                                _bitBoardData[i][k] = 0;
+                                // _boardData[x][y].transform.position = GetSpawnPos(x, y, offset);
+                                _boardData[x][k] = null;
+                                _bitBoardData[x][k] = 0;
 
                                 break;
                             }
@@ -145,17 +183,19 @@ namespace _Data.Scripts.Services.Board
                     }
                 }
             }
+
+            return s;
         }
 
         public void Fill(int boardSize, Transform holder, MatchService matchService)
         {
-            for (int i = 0; i < boardSize; i++)
+            for (int y = 0; y < boardSize; y++)
             {
-                for (int j = 0; j < boardSize; j++)
+                for (int x = 0; x < boardSize; x++)
                 {
-                    if (_bitBoardData[i][j] == 0)
+                    if (_bitBoardData[x][y] == 0)
                     {
-                        Spawn(i, j, boardSize, holder);
+                        Spawn(x, y, boardSize, holder);
                     }
                 }
             }
@@ -176,26 +216,29 @@ namespace _Data.Scripts.Services.Board
             return offest;
         }
 
-        Vector2 GetSpawnPos(int i, int j, float offset)
+        Vector2 GetSpawnPos(int x, int y, float offset)
         {
-            return new Vector2(i / 2f + offset, j / 2f + offset);
+            return new Vector2(x / 2f + offset, y / 2f + offset);
         }
 
-        void Spawn(int i, int j, int boardSize, Transform holder)
+        Tween Spawn(int x, int y, int boardSize, Transform holder)
         {
             var type = Random.Range(1, 7);
             var enumType = (CandyEnum)type;
             var name = enumType.ToString();
 
-            var newCandy = PoolManager.Ins.Spawn(name, GetSpawnPos(i, j, GetOffest(boardSize)), Quaternion.identity);
+            var newCandy = PoolManager.Ins.Spawn(name, GetSpawnPos(x, y, GetOffest(boardSize)), Quaternion.identity);
+            Tween spawn = newCandy.transform.DOScale(Vector3.one, 0.25f).SetEase(Ease.OutQuad);
             var comp = newCandy.GetComponent<CandyController>();
-            comp.SetPosition(new Vector2Int(i, j));
+            comp.SetPosition(new Vector2Int(x, y));
             comp.SetEnumType(type);
 
-            _boardData[i][j] = newCandy;
-            _bitBoardData[i][j] = type;
+            _boardData[x][y] = newCandy;
+            _bitBoardData[x][y] = type;
 
             newCandy.transform.parent = holder;
+
+            return spawn;
         }
 
         #endregion

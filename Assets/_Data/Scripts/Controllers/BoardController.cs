@@ -63,5 +63,10 @@ namespace _Data.Scripts.Controllers
             _stateMachine.AddState(BoardState.Fill, new FillState(this, _stateMachine));
             _stateMachine.SetInitState(BoardState.Start);
         }
+        
+        public void TestShuffle()
+        {
+            BoardService.BoardShuffle(boardSize);
+        }
     }
 }

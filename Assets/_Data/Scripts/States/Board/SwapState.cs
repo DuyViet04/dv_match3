@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using _Data.Scripts.Controllers;
 using Base.Core.StateMachine;
+using DG.Tweening;
 using UnityEngine;
 
 namespace _Data.Scripts.States.Board
@@ -21,19 +22,24 @@ namespace _Data.Scripts.States.Board
             }
 
             var dragPos = InputController.DragDirection;
-            bool swapped = BoardService.TrySwap(FirstCandy, dragPos, MatchService);
+            var sequence = BoardService.TrySwap(FirstCandy, dragPos, MatchService, out bool isMatch);
 
-            if (swapped)
+            sequence.OnComplete(() =>
             {
-                SecondCandy = BoardService.Second;
-                var totalRemove = FindAll(FirstCandy, SecondCandy, BoardService.BitBoardData);
-                BoardService.RemoveMatch(totalRemove);
-                StateMachine.ChangeState(BoardState.Fall);
-            }
-            else
-            {
-                StateMachine.ChangeState(BoardState.Idle);
-            }
+                if (isMatch)
+                {
+                    SecondCandy = BoardService.Second;
+                    var totalRemove = FindAll(FirstCandy, SecondCandy, BoardService.BitBoardData);
+                    BoardService.RemoveMatch(totalRemove).OnComplete(() =>
+                    {
+                        StateMachine.ChangeState(BoardState.Fall);
+                    });
+                }
+                else
+                {
+                    StateMachine.ChangeState(BoardState.Idle);
+                }
+            });
         }
 
         public override void OnUpdate()

@@ -18,7 +18,7 @@ namespace _Data.Scripts.Controllers
 
         public bool IsClick()
         {
-            if (Mouse.current.leftButton.wasPressedThisFrame)
+            if (Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
             {
                 _startPos = mainCamera.ScreenToWorldPoint(InputManager.Ins.Mouse);
                 return true;
@@ -29,7 +29,7 @@ namespace _Data.Scripts.Controllers
 
         public bool IsDrag()
         {
-            if (Mouse.current.leftButton.wasReleasedThisFrame)
+            if (Touchscreen.current.primaryTouch.press.wasReleasedThisFrame)
             {
                 _endPos = mainCamera.ScreenToWorldPoint(InputManager.Ins.Mouse);
 

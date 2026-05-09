@@ -1,5 +1,7 @@
 using _Data.Scripts.Controllers;
 using Base.Core.StateMachine;
+using DG.Tweening;
+using UnityEngine;
 
 namespace _Data.Scripts.States.Board
 {
@@ -12,8 +14,11 @@ namespace _Data.Scripts.States.Board
 
         public override void OnEnter()
         {
-            BoardService.GenerateBoard(BoardSize, Holder);
-            StateMachine.ChangeState(BoardState.Idle);
+            Time.timeScale = 10;
+            BoardService.GenerateBoard(BoardSize, Holder).OnComplete(() =>
+            {
+                StateMachine.ChangeState(BoardState.Idle);
+            });
         }
 
         public override void OnUpdate()

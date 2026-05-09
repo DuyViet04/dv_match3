@@ -26,13 +26,13 @@ namespace _Data.Scripts.Services.Board
         {
             var allMatchedPositions = new HashSet<Vector2Int>();
 
-            for (int i = 0; i < boardSize; i++)
+            for (int y = 0; y < boardSize; y++)
             {
-                for (int j = 0; j < boardSize; j++)
+                for (int x = 0; x < boardSize; x++)
                 {
-                    if (boardService.BoardData[i][j] == null) continue;
+                    if (boardService.BoardData[x][y] == null) continue;
 
-                    var find = FindMatch(boardService.BoardData[i][j], boardService.BitBoardData);
+                    var find = FindMatch(boardService.BoardData[x][y], boardService.BitBoardData);
                     for (int k = 0; k < find.Count; k++)
                     {
                         allMatchedPositions.Add(find[k]);
@@ -53,7 +53,7 @@ namespace _Data.Scripts.Services.Board
             var vertical = FindVertical(pos, type, bitBoard);
 
             var find = new HashSet<Vector2Int>();
-            if (horizontal != null)
+            if (horizontal.Count > 0)
             {
                 for (int i = 0; i < horizontal.Count; i++)
                 {
@@ -61,7 +61,7 @@ namespace _Data.Scripts.Services.Board
                 }
             }
 
-            if (vertical != null)
+            if (vertical.Count > 0)
             {
                 for (int i = 0; i < vertical.Count; i++)
                 {
@@ -134,13 +134,13 @@ namespace _Data.Scripts.Services.Board
         {
             var bitBoard = boardService.BitBoardData; 
 
-            for (int i = 0; i < boardSize; i++)
+            for (int y = 0; y < boardSize; y++)
             {
-                for (int j = 0; j < boardSize; j++)
+                for (int x = 0; x < boardSize; x++)
                 {
                     for (int k = 0; k < _dirs.Count; k++)
                     {
-                        var posA = new Vector2Int(i, j);
+                        var posA = new Vector2Int(x, y);
                         var posB = posA + _dirs[k];
 
                         if (posB.x < 0 || posB.x >= boardSize ||
@@ -166,8 +166,9 @@ namespace _Data.Scripts.Services.Board
                 FindHorizontal(posB, bitBoard[posB.x][posB.y], bitBoard).Count > 0 ||
                 FindVertical(posB, bitBoard[posB.x][posB.y], bitBoard).Count > 0;
 
-            bitBoard[posB.x][posB.y] = bitBoard[posA.x][posA.y];
-            bitBoard[posA.x][posA.y] = temp;
+            int tempB = bitBoard[posA.x][posA.y];
+            bitBoard[posA.x][posA.y] = bitBoard[posB.x][posB.y];
+            bitBoard[posB.x][posB.y] = tempB;
 
             return hasMatch;
         }
