@@ -16,12 +16,15 @@ namespace _Data.Scripts.Views.UIs
 
         private void OnDisable()
         {
-            ScoreManager.Ins.OnScoreChanged -= UpdateScoreText;
+            if (ScoreManager.HasInstance)
+            {
+                ScoreManager.Ins.OnScoreChanged -= UpdateScoreText;
+            }
         }
 
         private void UpdateScoreText(int score)
         {
-            scoreText.text = $"{score}";
+             scoreText.text = $"{score}";
         }
     }
 }

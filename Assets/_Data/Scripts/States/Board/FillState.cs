@@ -13,7 +13,7 @@ namespace _Data.Scripts.States.Board
 
         public override void OnEnter()
         {
-            BoardService.Fill(BoardSize, Holder, MatchService).OnComplete(() =>
+            BoardService.Fill(BoardSize, Holder).OnComplete(() =>
             {
                 StateMachine.ChangeState(BoardState.Idle);
             });

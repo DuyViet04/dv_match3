@@ -8,7 +8,7 @@ namespace _Data.Scripts.Manager
         protected override void Awake()
         {
             base.Awake();
-            DOTween.SetTweensCapacity(300, 30);
+            DOTween.SetTweensCapacity(500, 50);
         }
     }
 }

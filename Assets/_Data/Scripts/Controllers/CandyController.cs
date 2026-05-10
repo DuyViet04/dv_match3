@@ -1,6 +1,5 @@
 using Base.Core.Architecture;
 using Base.Systems.Pool;
-using DG.Tweening;
 using UnityEngine;
 
 namespace _Data.Scripts.Controllers
@@ -21,14 +20,14 @@ namespace _Data.Scripts.Controllers
         {
         }
 
-        public void SetPosition(Vector2Int position)
+        public void SetPosition(Vector2Int newPos)
         {
-            this.position = position;
+            position = newPos;
         }
 
-        public void SetEnumType(int enumType)
+        public void SetEnumType(int type)
         {
-            this.enumType = enumType;
+            enumType = type;
         }
     }
 }

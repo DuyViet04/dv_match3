@@ -4,10 +4,11 @@ using UnityEngine;
 
 namespace _Data.Scripts.Manager
 {
+    [DefaultExecutionOrder(-100)]
     public class ScoreManager : VyesSingleton<ScoreManager>
     {
         private int _score;
-        private int _scoreToIncreaseHard = 10000;
+        private readonly int _scoreToIncreaseHard = 10000;
 
         public event Action<int> OnScoreChanged;
 

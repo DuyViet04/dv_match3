@@ -23,23 +23,79 @@ namespace _Data.Scripts.States.Board
 
             var dragPos = InputController.DragDirection;
             var sequence = BoardService.TrySwap(FirstCandy, dragPos, MatchService, out bool isMatch);
+            if (sequence == null)
+            {
+                StateMachine.ChangeState(BoardState.Idle);
+                return;
+            }
 
             sequence.OnComplete(() =>
             {
                 if (isMatch)
                 {
                     SecondCandy = BoardService.Second;
-                    var totalRemove = FindAll(FirstCandy, SecondCandy, BoardService.BitBoardData);
-                    BoardService.RemoveMatch(totalRemove).OnComplete(() =>
-                    {
-                        StateMachine.ChangeState(BoardState.Fall);
-                    });
+                    ExecuteMatch(FirstCandy, SecondCandy);
                 }
                 else
                 {
                     StateMachine.ChangeState(BoardState.Idle);
                 }
             });
+        }
+
+        void ExecuteMatch(GameObject first, GameObject second)
+        {
+            var firstComp  = first.GetComponent<CandyController>();
+            var secondComp = second.GetComponent<CandyController>();
+            int firstType  = firstComp.EnumType;
+            int secondType = secondComp.EnumType;
+
+            var allPos = new HashSet<Vector2Int>();
+
+            var find1 = MatchService.FindMatch(first,  BoardService.BitBoardData, out var spawnInfo1);
+            var find2 = MatchService.FindMatch(second, BoardService.BitBoardData, out var spawnInfo2);
+            foreach (var p in find1) allPos.Add(p);
+            foreach (var p in find2) allPos.Add(p);
+            if (BoardService.IsColorBomb(firstType))
+            {
+                int targetColor = BoardService.IsSpecial(secondType)
+                    ? BoardService.GetMostCommonColor(BoardSize)
+                    : BoardService.GetBaseColor(secondType);
+                var area = BoardService.GetActivationArea(first, BoardSize, targetColor);
+                area.Add(firstComp.Position);
+                foreach (var p in area) allPos.Add(p);
+            }
+            else if (BoardService.IsSpecial(firstType))
+            {
+                var area = BoardService.GetActivationArea(first, BoardSize);
+                area.Add(firstComp.Position);
+                foreach (var p in area) allPos.Add(p);
+            }
+
+            if (BoardService.IsColorBomb(secondType))
+            {
+                int targetColor = BoardService.IsSpecial(firstType)
+                    ? BoardService.GetMostCommonColor(BoardSize)
+                    : BoardService.GetBaseColor(firstType);
+                var area = BoardService.GetActivationArea(second, BoardSize, targetColor);
+                area.Add(secondComp.Position);
+                foreach (var p in area) allPos.Add(p);
+            }
+            else if (BoardService.IsSpecial(secondType))
+            {
+                var area = BoardService.GetActivationArea(second, BoardSize);
+                area.Add(secondComp.Position);
+                foreach (var p in area) allPos.Add(p);
+            }
+
+            var bestSpawn = MatchService.PickBestSpawnInfo(spawnInfo1, spawnInfo2);
+
+            BoardService.RemoveMatch(new List<Vector2Int>(allPos), canDestroyBrick: true)
+                .OnComplete(() =>
+                {
+                    BoardService.SpawnSpecialCandy(bestSpawn, Holder, BoardSize);
+                    StateMachine.ChangeState(BoardState.Fall);
+                });
         }
 
         public override void OnUpdate()
@@ -52,25 +108,6 @@ namespace _Data.Scripts.States.Board
 
         public override void OnExit()
         {
-        }
-
-        List<Vector2Int> FindAll(GameObject firstCandy, GameObject secondCandy, int[][] bitBoardData)
-        {
-            var hs = new HashSet<Vector2Int>();
-            var firstFind = MatchService.FindMatch(firstCandy, bitBoardData);
-            var secondFind = MatchService.FindMatch(secondCandy, bitBoardData);
-
-            for (int i = 0; i < firstFind.Count; i++)
-            {
-                hs.Add(firstFind[i]);
-            }
-
-            for (int i = 0; i < secondFind.Count; i++)
-            {
-                hs.Add(secondFind[i]);
-            }
-
-            return new List<Vector2Int>(hs);
         }
     }
 }

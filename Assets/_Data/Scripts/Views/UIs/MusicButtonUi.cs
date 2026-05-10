@@ -16,7 +16,10 @@ namespace _Data.Scripts.Views.UIs
 
         private void OnDisable()
         {
-            slider.onValueChanged.RemoveListener(SoundManager.Ins.UpdateMusicVolume);
+            if (SoundManager.HasInstance)
+            {
+                slider.onValueChanged.RemoveListener(SoundManager.Ins.UpdateMusicVolume);
+            }
         }
     }
 }

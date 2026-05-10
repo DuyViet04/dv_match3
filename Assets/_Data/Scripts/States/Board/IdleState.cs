@@ -1,11 +1,15 @@
 using _Data.Scripts.Controllers;
+using _Data.Scripts.Manager;
 using Base.Core.StateMachine;
+using DG.Tweening;
 using UnityEngine;
 
 namespace _Data.Scripts.States.Board
 {
     public class IdleState : BaseBoardState
     {
+        private int _brickCount;
+
         public IdleState(BoardController controller, StateMachine<BoardState> stateMachine) : base(controller,
             stateMachine)
         {
@@ -14,12 +18,33 @@ namespace _Data.Scripts.States.Board
         public override void OnEnter()
         {
             Time.timeScale = 1;
-            while (!MatchService.CanMove(BoardSize, BoardService))
+
+            int shuffleCount = 0;
+            while (!MatchService.CanMove(BoardSize, BoardService) && shuffleCount < 10)
             {
                 BoardService.BoardShuffle(BoardSize);
+                shuffleCount++;
             }
 
-            MatchService.FindCombo(BoardSize, Holder, BoardService);
+            if (shuffleCount == 10)
+            {
+                WinPanel.SetActive(true);
+            }
+
+            var score = ScoreManager.Ins.Score;
+            var scoreToIncrease = ScoreManager.Ins.ScoreToIncreaseHard;
+
+            if (score >= scoreToIncrease * (_brickCount + 1))
+            {
+                Controller.SpawnBrick();
+                _brickCount++;
+            }
+
+            var matched = MatchService.FindAllMatches(BoardSize, BoardService);
+            if (matched.Count > 0)
+            {
+                BoardService.RemoveMatch(matched).OnComplete(() => { StateMachine.ChangeState(BoardState.Fall); });
+            }
         }
 
         public override void OnUpdate()
@@ -30,7 +55,31 @@ namespace _Data.Scripts.States.Board
                 RaycastHit2D hit2D = Physics2D.Raycast(startPos, Vector2.zero);
                 if (hit2D.collider != null)
                 {
-                    FirstCandy = hit2D.collider.gameObject;
+                    var candy = hit2D.collider.gameObject;
+                    var comp  = candy.GetComponent<CandyController>();
+
+                    // Kích hoạt ngay nếu là kẹo đặc biệt
+                    if (BoardService.IsColorBomb(comp.EnumType))
+                    {
+                        int targetColor = BoardService.GetMostCommonColor(BoardSize);
+                        var area = BoardService.GetActivationArea(candy, BoardSize, targetColor);
+                        area.Add(comp.Position); // xóa cả chính nó
+                        BoardService.RemoveMatch(area, canDestroyBrick: true)
+                            .OnComplete(() => StateMachine.ChangeState(BoardState.Fall));
+                        return;
+                    }
+
+                    if (BoardService.IsSpecial(comp.EnumType))
+                    {
+                        var area = BoardService.GetActivationArea(candy, BoardSize);
+                        area.Add(comp.Position);
+                        BoardService.RemoveMatch(area, canDestroyBrick: true)
+                            .OnComplete(() => StateMachine.ChangeState(BoardState.Fall));
+                        return;
+                    }
+
+                    // Kẹo thường → chọn để drag
+                    FirstCandy = candy;
                 }
             }
 

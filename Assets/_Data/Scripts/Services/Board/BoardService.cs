@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using _Data.Scripts.Controllers;
 using _Data.Scripts.Enum;
+using _Data.Scripts.Manager;
 using Base.Systems.Pool;
+using Base.Systems.Sound;
 using Base.Utilities;
 using DG.Tweening;
 using UnityEngine;
@@ -17,6 +19,10 @@ namespace _Data.Scripts.Services.Board
         public GameObject[][] BoardData => _boardData;
         public int[][] BitBoardData => _bitBoardData;
         public GameObject Second => _second;
+
+        // Cache
+        private Vector2Int _candyPos;
+        private Vector2 _spawnPos;
 
         #region Board Generation
 
@@ -46,16 +52,38 @@ namespace _Data.Scripts.Services.Board
 
         public void BoardShuffle(int boardSize)
         {
-            _boardData.Shuffle();
+            List<GameObject> candiesToShuffle = new List<GameObject>();
+            List<Vector2Int> positionsToShuffle = new List<Vector2Int>();
+
             for (int y = 0; y < boardSize; y++)
             {
                 for (int x = 0; x < boardSize; x++)
                 {
-                    var candy = _boardData[x][y];
-                    candy.transform.position = GetSpawnPos(x, y, GetOffest(boardSize));
-                    candy.GetComponent<CandyController>().SetPosition(new Vector2Int(x, y));
-                    _bitBoardData[x][y] = candy.GetComponent<CandyController>().EnumType;
+                    if (_bitBoardData[x][y] > 0)
+                    {
+                        _candyPos.x = x;
+                        _candyPos.y = y;
+                        candiesToShuffle.Add(_boardData[x][y]);
+                        positionsToShuffle.Add(_candyPos);
+                    }
                 }
+            }
+
+            candiesToShuffle.Shuffle();
+
+            float offset = GetOffset(boardSize);
+            for (int i = 0; i < positionsToShuffle.Count; i++)
+            {
+                Vector2Int pos = positionsToShuffle[i];
+                GameObject candy = candiesToShuffle[i];
+
+                _boardData[pos.x][pos.y] = candy;
+
+                var comp = candy.GetComponent<CandyController>();
+                comp.SetPosition(pos);
+                _bitBoardData[pos.x][pos.y] = comp.EnumType;
+
+                candy.transform.position = GetSpawnPos(pos.x, pos.y, offset);
             }
         }
 
@@ -65,6 +93,7 @@ namespace _Data.Scripts.Services.Board
 
         public void SwapData(GameObject first, GameObject second)
         {
+            SoundManager.Ins.PlaySfx(nameof(SoundEnum.Swap));
             var firstComp = first.GetComponent<CandyController>();
             var firstPos = firstComp.Position;
             var secondComp = second.GetComponent<CandyController>();
@@ -89,6 +118,9 @@ namespace _Data.Scripts.Services.Board
             if (secondPos.x < 0 || secondPos.x >= _boardData.Length ||
                 secondPos.y < 0 || secondPos.y >= _boardData[0].Length) return null;
 
+            if (_bitBoardData[firstPos.x][firstPos.y] == -1 || _bitBoardData[secondPos.x][secondPos.y] == -1)
+                return null;
+
             _second = _boardData[secondPos.x][secondPos.y];
 
             var pos1 = first.transform.position;
@@ -96,12 +128,14 @@ namespace _Data.Scripts.Services.Board
 
             SwapData(first, _second);
 
-            var find1 = matchService.FindMatch(first, _bitBoardData);
-            var find2 = matchService.FindMatch(_second, _bitBoardData);
+            bool eitherIsSpecial = IsSpecial(firstComp.EnumType) ||
+                                   IsSpecial(_second.GetComponent<CandyController>().EnumType);
+            var find1 = matchService.FindMatch(first, _bitBoardData, out _);
+            var find2 = matchService.FindMatch(_second, _bitBoardData, out _);
 
             Sequence s = DOTween.Sequence();
 
-            if (find1.Count > 0 || find2.Count > 0)
+            if (eitherIsSpecial || find1.Count > 0 || find2.Count > 0)
             {
                 isMatch = true;
                 s.Append(first.transform.DOMove(pos2, 0.25f).SetEase(Ease.OutQuad));
@@ -110,10 +144,8 @@ namespace _Data.Scripts.Services.Board
             else
             {
                 SwapData(first, _second);
-
                 s.Append(first.transform.DOMove(pos2, 0.2f).SetEase(Ease.OutQuad));
                 s.Join(_second.transform.DOMove(pos1, 0.2f).SetEase(Ease.OutQuad));
-
                 s.Append(first.transform.DOMove(pos1, 0.2f).SetEase(Ease.InQuad));
                 s.Join(_second.transform.DOMove(pos2, 0.2f).SetEase(Ease.InQuad));
             }
@@ -121,16 +153,18 @@ namespace _Data.Scripts.Services.Board
             return s;
         }
 
-        public Sequence RemoveMatch(List<Vector2Int> pos)
+        public Sequence RemoveMatch(List<Vector2Int> pos, bool canDestroyBrick = false)
         {
+            SoundManager.Ins.PlaySfx(nameof(SoundEnum.Remove));
             Sequence s = DOTween.Sequence();
-
-            var candyList = new List<GameObject>(pos.Count);
+            var candyList = new List<GameObject>();
 
             for (int i = 0; i < pos.Count; i++)
             {
                 var x = pos[i].x;
                 var y = pos[i].y;
+
+                if (_boardData[x][y] == null) continue;
 
                 candyList.Add(_boardData[x][y]);
                 s.Join(_boardData[x][y].transform.DOScale(Vector3.zero, 0.25f).SetEase(Ease.OutQuad));
@@ -147,38 +181,63 @@ namespace _Data.Scripts.Services.Board
                 }
             });
 
+            ScoreManager.Ins.AddScore(candyList.Count);
             return s;
         }
 
         public Sequence Fall(int boardSize)
         {
             Sequence s = DOTween.Sequence();
+            float offset = GetOffset(boardSize);
 
-            float offset = GetOffest(boardSize);
+            bool changed = true;
 
-            for (int y = 0; y < boardSize; y++)
+            // Rơi thẳng
+            while (changed)
             {
-                for (int x = 0; x < boardSize; x++)
+                changed = false;
+
+                for (int y = 0; y < boardSize; y++)
                 {
-                    if (_bitBoardData[x][y] == 0)
+                    for (int x = 0; x < boardSize; x++)
                     {
+                        if (_bitBoardData[x][y] != 0) continue;
+
                         for (int k = y + 1; k < boardSize; k++)
                         {
+                            if (_bitBoardData[x][k] == -1) break;
                             if (_bitBoardData[x][k] != 0)
                             {
-                                _boardData[x][y] = _boardData[x][k];
-                                _bitBoardData[x][y] = _bitBoardData[x][k];
-
-                                var candy = _boardData[x][y].GetComponent<CandyController>();
-                                candy.SetPosition(new Vector2Int(x, y));
-                                s.Join(candy.transform.DOMove(GetSpawnPos(x, y, offset), 0.25f).SetEase(Ease.OutQuad));
-
-                                // _boardData[x][y].transform.position = GetSpawnPos(x, y, offset);
-                                _boardData[x][k] = null;
-                                _bitBoardData[x][k] = 0;
-
+                                MoveCandy(x, k, x, y, offset, s);
+                                changed = true;
                                 break;
                             }
+                        }
+                    }
+                }
+
+                // Rơi chéo
+                for (int y = 0; y < boardSize; y++)
+                {
+                    for (int x = 0; x < boardSize; x++)
+                    {
+                        if (_bitBoardData[x][y] != 0) continue;
+
+                        int diagY = y + 1;
+                        if (diagY >= boardSize) continue;
+
+                        int leftX = x - 1;
+                        int rightX = x + 1;
+
+                        if (leftX >= 0 && _bitBoardData[leftX][diagY] > 0)
+                        {
+                            MoveCandy(leftX, diagY, x, y, offset, s);
+                            changed = true;
+                        }
+                        else if (rightX < boardSize && _bitBoardData[rightX][diagY] > 0)
+                        {
+                            MoveCandy(rightX, diagY, x, y, offset, s);
+                            changed = true;
                         }
                     }
                 }
@@ -187,47 +246,174 @@ namespace _Data.Scripts.Services.Board
             return s;
         }
 
-        public void Fill(int boardSize, Transform holder, MatchService matchService)
+        public Sequence Fill(int boardSize, Transform holder)
         {
+            Sequence s = DOTween.Sequence();
             for (int y = 0; y < boardSize; y++)
             {
                 for (int x = 0; x < boardSize; x++)
                 {
                     if (_bitBoardData[x][y] == 0)
                     {
-                        Spawn(x, y, boardSize, holder);
+                        s.Join(Spawn(x, y, boardSize, holder));
                     }
                 }
             }
 
-            while (!matchService.CanMove(boardSize, this))
+            return s;
+        }
+
+        #endregion
+
+        #region Special Candy
+
+        public List<Vector2Int> GetActivationArea(GameObject candy, int boardSize, int targetColor = -1)
+        {
+            var comp = candy.GetComponent<CandyController>();
+            var pos = comp.Position;
+            var type = comp.EnumType;
+            var result = new List<Vector2Int>();
+
+            if (IsLineHorizontal(type))
             {
-                BoardShuffle(boardSize);
+                for (int x = 0; x < boardSize; x++)
+                {
+                    result.Add(new Vector2Int(x, pos.y));
+                }
             }
+            else if (IsLineVertical(type))
+            {
+                for (int y = 0; y < boardSize; y++)
+                {
+                    result.Add(new Vector2Int(pos.x, y));
+                }
+            }
+            else if (IsBomb(type))
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        int nx = pos.x + dx, ny = pos.y + dy;
+                        if (nx >= 0 && nx < boardSize && ny >= 0 && ny < boardSize)
+                        {
+                            result.Add(new Vector2Int(nx, ny));
+                        }
+                    }
+                }
+            }
+            else if (IsColorBomb(type))
+            {
+                int color = (targetColor > 0) ? targetColor : GetMostCommonColor(boardSize);
+                result.AddRange(GetColorBombArea(color, boardSize));
+            }
+
+            return result;
+        }
+
+        public List<Vector2Int> GetColorBombArea(int targetColor, int boardSize)
+        {
+            var result = new List<Vector2Int>();
+            for (int y = 0; y < boardSize; y++)
+            {
+                for (int x = 0; x < boardSize; x++)
+                {
+                    int t = _bitBoardData[x][y];
+                    if (t > 0 && GetBaseColor(t) == targetColor)
+                    {
+                        _candyPos.x = x;
+                        _candyPos.y = y;
+                        result.Add(_candyPos);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        public int GetMostCommonColor(int boardSize)
+        {
+            var counts = new int[7]; // index 1-6
+            for (int y = 0; y < boardSize; y++)
+            {
+                for (int x = 0; x < boardSize; x++)
+                {
+                    int t = _bitBoardData[x][y];
+                    if (t >= 1 && t <= 6) counts[t]++;
+                }
+            }
+
+            int best = 1;
+            for (int c = 2; c <= 6; c++)
+            {
+                if (counts[c] > counts[best])
+                {
+                    best = c;
+                }
+            }
+            return best;
+        }
+
+        public void SpawnSpecialCandy(SpawnInfo spawnInfo, Transform holder, int boardSize)
+        {
+            if (spawnInfo.Special == SpecialEnum.None) return;
+
+            var pos = spawnInfo.SpawnPos;
+
+            if (_bitBoardData[pos.x][pos.y] != 0) return;
+
+            int spawnType;
+            string poolKey;
+
+            if (spawnInfo.Special == SpecialEnum.ColorBomb)
+            {
+                spawnType = (int)CandyEnum.ColorBomb;
+                poolKey = nameof(CandyEnum.ColorBomb);
+            }
+            else
+            {
+                int offset = (int)spawnInfo.Special * 6;
+                spawnType = spawnInfo.ColorType + offset;
+                poolKey = ((CandyEnum)spawnType).ToString();
+            }
+
+            float o = GetOffset(boardSize);
+            var candy = PoolManager.Ins.Spawn(poolKey, GetSpawnPos(pos.x, pos.y, o), Quaternion.identity);
+            candy.transform.SetParent(holder);
+            candy.transform.localScale = Vector3.zero;
+            candy.transform.DOScale(Vector3.one, 0.3f).SetEase(Ease.OutBack);
+
+            var comp = candy.GetComponent<CandyController>();
+            comp.SetPosition(pos);
+            comp.SetEnumType(spawnType);
+
+            _boardData[pos.x][pos.y] = candy;
+            _bitBoardData[pos.x][pos.y] = spawnType;
         }
 
         #endregion
 
         #region Helper
 
-        float GetOffest(int boardSize)
+        public float GetOffset(int boardSize)
         {
-            float offest = -(boardSize - 1) / 4f;
-            return offest;
+            float offset = -(boardSize - 1) / 4f;
+            return offset;
         }
 
-        Vector2 GetSpawnPos(int x, int y, float offset)
+        public Vector2 GetSpawnPos(int x, int y, float offset)
         {
-            return new Vector2(x / 2f + offset, y / 2f + offset);
+            _spawnPos.x = x / 2f + offset;
+            _spawnPos.y = y / 2f + offset;
+            return _spawnPos;
         }
 
         Tween Spawn(int x, int y, int boardSize, Transform holder)
         {
             var type = Random.Range(1, 7);
-            var enumType = (CandyEnum)type;
-            var name = enumType.ToString();
+            var poolKey = ((CandyEnum)type).ToString();
 
-            var newCandy = PoolManager.Ins.Spawn(name, GetSpawnPos(x, y, GetOffest(boardSize)), Quaternion.identity);
+            var newCandy = PoolManager.Ins.Spawn(poolKey, GetSpawnPos(x, y, GetOffset(boardSize)), Quaternion.identity);
             Tween spawn = newCandy.transform.DOScale(Vector3.one, 0.25f).SetEase(Ease.OutQuad);
             var comp = newCandy.GetComponent<CandyController>();
             comp.SetPosition(new Vector2Int(x, y));
@@ -239,6 +425,35 @@ namespace _Data.Scripts.Services.Board
             newCandy.transform.parent = holder;
 
             return spawn;
+        }
+
+        void MoveCandy(int fromX, int fromY, int toX, int toY, float offset, Sequence s)
+        {
+            _boardData[toX][toY] = _boardData[fromX][fromY];
+            _bitBoardData[toX][toY] = _bitBoardData[fromX][fromY];
+
+            var candy = _boardData[toX][toY].GetComponent<CandyController>();
+            candy.SetPosition(new Vector2Int(toX, toY));
+            s.Join(candy.transform.DOMove(GetSpawnPos(toX, toY, offset), 0.25f).SetEase(Ease.OutQuad));
+
+            _boardData[fromX][fromY] = null;
+            _bitBoardData[fromX][fromY] = 0;
+        }
+
+        #endregion
+
+        #region Type Helpers
+
+        public bool IsLineHorizontal(int type) => type >= 7 && type <= 12;
+        public bool IsLineVertical(int type) => type >= 13 && type <= 18;
+        public bool IsBomb(int type) => type >= 19 && type <= 24;
+        public bool IsColorBomb(int type) => type == 25;
+        public bool IsSpecial(int type) => type >= 7;
+
+        public int GetBaseColor(int type)
+        {
+            if (type <= 0) return 0;
+            return ((type - 1) % 6) + 1;
         }
 
         #endregion

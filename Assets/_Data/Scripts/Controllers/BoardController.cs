@@ -1,5 +1,4 @@
 using _Data.Scripts.Enum;
-using _Data.Scripts.Manager;
 using _Data.Scripts.Services.Board;
 using _Data.Scripts.States.Board;
 using Base.Core.Architecture;
@@ -13,16 +12,13 @@ namespace _Data.Scripts.Controllers
     public class BoardController : BaseController
     {
         [SerializeField] private InputController inputController;
-
-        [Header("Board Settings")] [SerializeField]
-        private int boardSize;
-
+        [Header("Board Settings")] 
+        [SerializeField] private int boardSize;
         [SerializeField] private Transform holder;
+        [Header("Other Settings")]
         [SerializeField] private GameObject winPanel;
 
         private StateMachine<BoardState> _stateMachine;
-        private GameObject _firstCandy;
-        private GameObject _secondCandy;
 
         private readonly BoardService _boardService = new BoardService();
         private readonly MatchService _matchService = new MatchService();
@@ -33,18 +29,8 @@ namespace _Data.Scripts.Controllers
         public GameObject WinPanel => winPanel;
         public BoardService BoardService => _boardService;
         public MatchService MatchService => _matchService;
-
-        public GameObject FirstCandy
-        {
-            get => _firstCandy;
-            set => _firstCandy = value;
-        }
-
-        public GameObject SecondCandy
-        {
-            get => _secondCandy;
-            set => _secondCandy = value;
-        }
+        public GameObject FirstCandy { get; set; }
+        public GameObject SecondCandy { get; set; }
 
         protected override void Awake()
         {
@@ -60,6 +46,7 @@ namespace _Data.Scripts.Controllers
         public void SpawnBrick()
         {
             int randX = -1, randY = -1;
+            
             int maxAttempts = 100;
             while (maxAttempts > 0)
             {
