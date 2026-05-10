@@ -9,6 +9,7 @@ namespace _Data.Scripts.States.Board
     public class IdleState : BaseBoardState
     {
         private int _brickCount;
+        private bool _isProcessing;
 
         public IdleState(BoardController controller, StateMachine<BoardState> stateMachine) : base(controller,
             stateMachine)
@@ -18,6 +19,7 @@ namespace _Data.Scripts.States.Board
         public override void OnEnter()
         {
             Time.timeScale = 1;
+            _isProcessing = false;
 
             int shuffleCount = 0;
             while (!MatchService.CanMove(BoardSize, BoardService) && shuffleCount < 10)
@@ -43,12 +45,15 @@ namespace _Data.Scripts.States.Board
             var matched = MatchService.FindAllMatches(BoardSize, BoardService);
             if (matched.Count > 0)
             {
+                _isProcessing = true;
                 BoardService.RemoveMatch(matched).OnComplete(() => { StateMachine.ChangeState(BoardState.Fall); });
             }
         }
 
         public override void OnUpdate()
         {
+            if (_isProcessing) return;
+
             if (InputController.IsClick())
             {
                 var startPos = InputController.StartPosition;
@@ -61,6 +66,7 @@ namespace _Data.Scripts.States.Board
                     // Kích hoạt ngay nếu là kẹo đặc biệt
                     if (BoardService.IsColorBomb(comp.EnumType))
                     {
+                        _isProcessing = true;
                         int targetColor = BoardService.GetMostCommonColor(BoardSize);
                         var area = BoardService.GetActivationArea(candy, BoardSize, targetColor);
                         area.Add(comp.Position); // xóa cả chính nó
@@ -71,6 +77,7 @@ namespace _Data.Scripts.States.Board
 
                     if (BoardService.IsSpecial(comp.EnumType))
                     {
+                        _isProcessing = true;
                         var area = BoardService.GetActivationArea(candy, BoardSize);
                         area.Add(comp.Position);
                         BoardService.RemoveMatch(area, canDestroyBrick: true)

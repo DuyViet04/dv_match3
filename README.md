@@ -1,6 +1,8 @@
 # 🎮 DV Match-3 Game
 
-Chào mừng bạn đến với **DV Match-3 Game**! Đây là một dự án game giải đố Match-3 hoàn chỉnh được phát triển trên Unity. Dự án được cấu trúc bài bản với các design pattern chuyên nghiệp, đem lại hiệu suất cao, khả năng mở rộng tốt và trải nghiệm mượt mà.
+[![DV Match-3 Demo](https://img.youtube.com/vi/yUev8EpaPmI/maxresdefault.jpg)](https://youtu.be/yUev8EpaPmI)
+
+Chào mừng bạn đến với **DV Match-3 Game**! Đây là một dự án game giải đố Match-3 được phát triển trên Unity. Dự án được cấu trúc bài bản với các design pattern chuyên nghiệp, đem lại hiệu suất cao, khả năng mở rộng tốt và trải nghiệm mượt mà.
 
 ## 🌟 Các Tính Năng Nổi Bật (Features)
 

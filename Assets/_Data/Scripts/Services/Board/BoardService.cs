@@ -118,7 +118,7 @@ namespace _Data.Scripts.Services.Board
             if (secondPos.x < 0 || secondPos.x >= _boardData.Length ||
                 secondPos.y < 0 || secondPos.y >= _boardData[0].Length) return null;
 
-            if (_bitBoardData[firstPos.x][firstPos.y] == -1 || _bitBoardData[secondPos.x][secondPos.y] == -1)
+            if (_bitBoardData[firstPos.x][firstPos.y] <= 0 || _bitBoardData[secondPos.x][secondPos.y] <= 0)
                 return null;
 
             _second = _boardData[secondPos.x][secondPos.y];
@@ -192,11 +192,12 @@ namespace _Data.Scripts.Services.Board
 
             bool changed = true;
 
-            // Rơi thẳng
+            // Xử lý logic rơi trên data trước
             while (changed)
             {
                 changed = false;
 
+                // Rơi thẳng
                 for (int y = 0; y < boardSize; y++)
                 {
                     for (int x = 0; x < boardSize; x++)
@@ -208,7 +209,7 @@ namespace _Data.Scripts.Services.Board
                             if (_bitBoardData[x][k] == -1) break;
                             if (_bitBoardData[x][k] != 0)
                             {
-                                MoveCandy(x, k, x, y, offset, s);
+                                MoveCandyDataOnly(x, k, x, y);
                                 changed = true;
                                 break;
                             }
@@ -231,13 +232,34 @@ namespace _Data.Scripts.Services.Board
 
                         if (leftX >= 0 && _bitBoardData[leftX][diagY] > 0)
                         {
-                            MoveCandy(leftX, diagY, x, y, offset, s);
+                            MoveCandyDataOnly(leftX, diagY, x, y);
                             changed = true;
                         }
                         else if (rightX < boardSize && _bitBoardData[rightX][diagY] > 0)
                         {
-                            MoveCandy(rightX, diagY, x, y, offset, s);
+                            MoveCandyDataOnly(rightX, diagY, x, y);
                             changed = true;
+                        }
+                    }
+                }
+            }
+
+            // Tạo animation sau khi đã có vị trí cuối cùng
+            for (int y = 0; y < boardSize; y++)
+            {
+                for (int x = 0; x < boardSize; x++)
+                {
+                    var candy = _boardData[x][y];
+                    if (candy != null)
+                    {
+                        var comp = candy.GetComponent<CandyController>();
+                        var targetPos = GetSpawnPos(x, y, offset);
+
+                        comp.SetPosition(new Vector2Int(x, y));
+
+                        if (Vector2.Distance(candy.transform.position, targetPos) > 0.01f)
+                        {
+                            s.Join(candy.transform.DOMove(targetPos, 0.25f).SetEase(Ease.OutQuad));
                         }
                     }
                 }
@@ -427,14 +449,10 @@ namespace _Data.Scripts.Services.Board
             return spawn;
         }
 
-        void MoveCandy(int fromX, int fromY, int toX, int toY, float offset, Sequence s)
+        void MoveCandyDataOnly(int fromX, int fromY, int toX, int toY)
         {
             _boardData[toX][toY] = _boardData[fromX][fromY];
             _bitBoardData[toX][toY] = _bitBoardData[fromX][fromY];
-
-            var candy = _boardData[toX][toY].GetComponent<CandyController>();
-            candy.SetPosition(new Vector2Int(toX, toY));
-            s.Join(candy.transform.DOMove(GetSpawnPos(toX, toY, offset), 0.25f).SetEase(Ease.OutQuad));
 
             _boardData[fromX][fromY] = null;
             _bitBoardData[fromX][fromY] = 0;
