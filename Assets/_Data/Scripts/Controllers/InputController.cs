@@ -52,19 +52,19 @@ namespace _Data.Scripts.Controllers
 
             if ((0 <= angle && angle < 45) || (315 <= angle && angle <= 360))
             {
-                return new Vector2Int(1, 0);
+                return Vector2Int.right;
             }
             else if (45 <= angle && angle < 135)
             {
-                return new Vector2Int(0, 1);
+                return Vector2Int.up;
             }
             else if (135 <= angle && angle < 225)
             {
-                return new Vector2Int(-1, 0);
+                return Vector2Int.left;
             }
             else if (225 <= angle && angle < 315)
             {
-                return new Vector2Int(0, -1);
+                return Vector2Int.down;
             }
 
             return Vector2Int.zero;

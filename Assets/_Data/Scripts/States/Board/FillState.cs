@@ -1,5 +1,6 @@
 using _Data.Scripts.Controllers;
 using Base.Core.StateMachine;
+using DG.Tweening;
 
 namespace _Data.Scripts.States.Board
 {
@@ -12,8 +13,10 @@ namespace _Data.Scripts.States.Board
 
         public override void OnEnter()
         {
-            BoardService.Fill(BoardSize, Holder, MatchService);
-            StateMachine.ChangeState(BoardState.Idle);
+            BoardService.Fill(BoardSize, Holder, MatchService).OnComplete(() =>
+            {
+                StateMachine.ChangeState(BoardState.Idle);
+            });
         }
 
         public override void OnUpdate()

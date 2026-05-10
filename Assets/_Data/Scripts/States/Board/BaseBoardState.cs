@@ -11,6 +11,7 @@ namespace _Data.Scripts.States.Board
         protected readonly InputController InputController;
         protected readonly int BoardSize;
         protected readonly Transform Holder;
+        protected readonly GameObject WinPanel;
         protected readonly StateMachine<BoardState> StateMachine;
         protected readonly BoardService BoardService;
         protected readonly MatchService MatchService;
@@ -33,6 +34,7 @@ namespace _Data.Scripts.States.Board
             InputController = controller.InputController;
             BoardSize = controller.BoardSize;
             Holder = controller.Holder;
+            WinPanel = controller.WinPanel;
             StateMachine = stateMachine;
             BoardService = controller.BoardService;
             MatchService = controller.MatchService;
